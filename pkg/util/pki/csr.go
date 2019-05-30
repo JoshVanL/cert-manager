@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha1"
@@ -115,7 +116,7 @@ func GenerateCSR(issuer v1alpha1.GenericIssuer, crt *v1alpha1.Certificate) (*x50
 	commonName := CommonNameForCertificate(crt)
 	dnsNames := DNSNamesForCertificate(crt)
 	iPAddresses := IPAddressesForCertificate(crt)
-	organization := OrganizationForCertificate(crt)
+	//organization := OrganizationForCertificate(crt)
 
 	if len(commonName) == 0 && len(dnsNames) == 0 {
 		return nil, fmt.Errorf("no domains specified on certificate")
@@ -126,15 +127,26 @@ func GenerateCSR(issuer v1alpha1.GenericIssuer, crt *v1alpha1.Certificate) (*x50
 		return nil, err
 	}
 
+	var uris []*url.URL
+	for _, name := range dnsNames {
+		uri, err := url.Parse(name)
+		if err != nil {
+			return nil, err
+		}
+
+		uris = append(uris, uri)
+	}
+
 	return &x509.CertificateRequest{
 		Version:            3,
 		SignatureAlgorithm: sigAlgo,
 		PublicKeyAlgorithm: pubKeyAlgo,
-		Subject: pkix.Name{
-			Organization: organization,
-			CommonName:   commonName,
+		Subject:            pkix.Name{
+			//Organization: organization,
+			//CommonName:   commonName,
 		},
-		DNSNames:    dnsNames,
+		//DNSNames:    dnsNames,
+		URIs:        uris,
 		IPAddresses: iPAddresses,
 		// TODO: work out how best to handle extensions/key usages here
 		ExtraExtensions: []pkix.Extension{},
@@ -175,6 +187,16 @@ func GenerateTemplate(crt *v1alpha1.Certificate) (*x509.Certificate, error) {
 		keyUsages |= x509.KeyUsageCertSign
 	}
 
+	var uris []*url.URL
+	for _, name := range dnsNames {
+		uri, err := url.Parse(name)
+		if err != nil {
+			return nil, err
+		}
+
+		uris = append(uris, uri)
+	}
+
 	return &x509.Certificate{
 		Version:               3,
 		BasicConstraintsValid: true,
@@ -188,8 +210,9 @@ func GenerateTemplate(crt *v1alpha1.Certificate) (*x509.Certificate, error) {
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(certDuration),
 		// see http://golang.org/pkg/crypto/x509/#KeyUsage
-		KeyUsage:    keyUsages,
-		DNSNames:    dnsNames,
+		KeyUsage: keyUsages,
+		//DNSNames:    dnsNames,
+		URIs:        uris,
 		IPAddresses: ipAddresses,
 	}, nil
 }

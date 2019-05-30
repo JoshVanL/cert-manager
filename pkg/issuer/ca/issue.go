@@ -107,9 +107,6 @@ func (c *CA) Issue(ctx context.Context, crt *v1alpha1.Certificate) (*issuer.Issu
 		log.Error(err, "error encoding x509 certificate chain")
 		return nil, err
 	}
-
-	certPem = append(certPem, chainPem...)
-
 	// Encode output private key and CA cert ready for return
 	keyPem, err := pki.EncodePrivateKey(signeeKey)
 	if err != nil {
