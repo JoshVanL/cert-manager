@@ -781,34 +781,29 @@ func mustGenerateCSR(t *testing.T, crt *cmapi.Certificate) []byte {
 }
 
 func Test_patchDuplicateKeyUsage(t *testing.T) {
-	tests := []struct {
-		name   string
+	tests := map[string]struct {
 		usages []cminternal.KeyUsage
 		want   []cminternal.KeyUsage
 	}{
-		{
-			name:   "Test single KU",
+		"Test single KU": {
 			usages: []cminternal.KeyUsage{cminternal.UsageKeyEncipherment},
 			want:   []cminternal.KeyUsage{cminternal.UsageKeyEncipherment},
 		},
-		{
-			name:   "Test UsageSigning",
+		"Test UsageSigning": {
 			usages: []cminternal.KeyUsage{cminternal.UsageSigning},
 			want:   []cminternal.KeyUsage{cminternal.UsageDigitalSignature},
 		},
-		{
-			name:   "Test multiple KU",
+		"Test multiple KU": {
 			usages: []cminternal.KeyUsage{cminternal.UsageDigitalSignature, cminternal.UsageServerAuth, cminternal.UsageClientAuth},
 			want:   []cminternal.KeyUsage{cminternal.UsageDigitalSignature, cminternal.UsageServerAuth, cminternal.UsageClientAuth},
 		},
-		{
-			name:   "Test double signing",
+		"Test double signing": {
 			usages: []cminternal.KeyUsage{cminternal.UsageSigning, cminternal.UsageDigitalSignature},
 			want:   []cminternal.KeyUsage{cminternal.UsageDigitalSignature},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := patchDuplicateKeyUsage(tt.usages); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("patchDuplicateKeyUsage() = %v, want %v", got, tt.want)
 			}
