@@ -42,6 +42,7 @@ load_image "quay.io/jetstack/cert-manager-controller:${APP_VERSION}" &
 load_image "quay.io/jetstack/cert-manager-acmesolver:${APP_VERSION}" &
 load_image "quay.io/jetstack/cert-manager-cainjector:${APP_VERSION}" &
 load_image "quay.io/jetstack/cert-manager-webhook:${APP_VERSION}" &
+load_image "quay.io/jetstack/cert-manager-approver:${APP_VERSION}" &
 wait
 
 # Ensure the namespace exists, and if not create it

@@ -26,8 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	authzclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 
 	"github.com/jetstack/cert-manager/pkg/internal/api/validation"
+	"github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/subjectaccessreview"
 )
 
 type registryBackedValidator struct {
@@ -36,13 +38,23 @@ type registryBackedValidator struct {
 	registry *validation.Registry
 }
 
-func NewRegistryBackedValidator(log logr.Logger, scheme *runtime.Scheme, registry *validation.Registry) *registryBackedValidator {
+func NewRegistryBackedValidator(
+	log logr.Logger,
+	scheme *runtime.Scheme,
+	registry *validation.Registry,
+	sarclient authzclient.SubjectAccessReviewInterface) (*registryBackedValidator, error) {
+
+	if err := subjectaccessreview.NewApproval(sarclient).AddToValidationRegistry(registry); err != nil {
+		return nil, err
+	}
+
 	factory := serializer.NewCodecFactory(scheme)
+
 	return &registryBackedValidator{
 		log:      log,
 		decoder:  factory.UniversalDecoder(),
 		registry: registry,
-	}
+	}, nil
 }
 
 func (r *registryBackedValidator) Validate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {

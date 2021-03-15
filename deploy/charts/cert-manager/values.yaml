@@ -348,11 +348,87 @@ cainjector:
   # Optional additional labels to add to the CA Injector Pods
   podLabels: {}
 
+  # Optional additional annotations to add to the controller Deployment
+  # deploymentAnnotations: {}
+
+  # Optional additional annotations to add to the controller Pods
+  # podAnnotations: {}
+
   image:
     repository: quay.io/jetstack/cert-manager-cainjector
     # You can manage a registry with
     # registry: quay.io
     # repository: jetstack/cert-manager-cainjector
+
+    # Override the image tag to deploy by setting this variable.
+    # If no value is set, the chart's appVersion will be used.
+    # tag: canary
+
+    # Setting a digest will override any tag
+    # digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
+
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    # name: ""
+    # Optional additional annotations to add to the controller's ServiceAccount
+    # annotations: {}
+    # Automount API credentials for a Service Account.
+    automountServiceAccountToken: true
+
+approver:
+  replicaCount: 1
+  timeoutSeconds: 10
+
+  strategy: {}
+    # type: RollingUpdate
+    # rollingUpdate:
+    #   maxSurge: 0
+    #   maxUnavailable: 1
+
+  securityContext: {}
+
+  # Container Security Context to be set on the webhook component container
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  containerSecurityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+
+  # Optional additional annotations to add to the webhook Deployment
+  # deploymentAnnotations: {}
+
+  # Optional additional annotations to add to the webhook Pods
+  # podAnnotations: {}
+
+  # Optional additional arguments for webhook
+  extraArgs: []
+
+  resources: {}
+    # requests:
+    #   cpu: 10m
+    #   memory: 32Mi
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  tolerations: []
+
+  # Optional additional labels to add to the Webhook Pods
+  podLabels: {}
+
+  image:
+    repository: quay.io/jetstack/cert-manager-approver
+    # You can manage a registry with
+    # registry: quay.io
+    # repository: jetstack/cert-manager-approver
 
     # Override the image tag to deploy by setting this variable.
     # If no value is set, the chart's appVersion will be used.

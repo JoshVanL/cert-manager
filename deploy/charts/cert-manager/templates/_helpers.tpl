@@ -126,3 +126,49 @@ Create the name of the service account to use
     {{ default "default" .Values.cainjector.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Approver templates
+*/}}
+
+{{/*
+Expand the name of the chart.
+Manually fix the 'app' and 'name' labels to 'approver' to maintain
+compatibility with the v0.9 deployment selector.
+*/}}
+{{- define "approver.name" -}}
+{{- printf "approver" -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "approver.fullname" -}}
+{{- $trimmedName := printf "%s" (include "cert-manager.fullname" .) | trunc 55 | trimSuffix "-" -}}
+{{- printf "%s-approver" $trimmedName | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "approver.caRef" -}}
+{{ .Release.Namespace}}/{{ template "approver.fullname" . }}-ca
+{{- end -}}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "approver.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "approver.serviceAccountName" -}}
+{{- if .Values.approver.serviceAccount.create -}}
+    {{ default (include "approver.fullname" .) .Values.approver.serviceAccount.name }}
+{{- else -}}
+    {{ default "default" .Values.approver.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+

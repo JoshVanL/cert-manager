@@ -20,6 +20,7 @@ go_library(
         "//pkg/internal/api/validation:go_default_library",
         "//pkg/internal/apis/acme:go_default_library",
         "//pkg/internal/apis/certmanager:go_default_library",
+        "//pkg/internal/apis/certmanager/util:go_default_library",
         "//pkg/internal/apis/certmanager/validation/util:go_default_library",
         "//pkg/internal/apis/meta:go_default_library",
         "//pkg/util:go_default_library",

@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//build:version.bzl", "version_x_defs")
+load("//build:go_binary.bzl", "go_binary")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/jetstack/cert-manager/cmd/approver",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//cmd/approver/app:go_default_library",
+        "//pkg/logs:go_default_library",
+        "//pkg/util/cmd:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "approver",
+    embed = [":go_default_library"],
+    pure = "on",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/approver/app:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

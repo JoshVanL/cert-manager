@@ -18,6 +18,9 @@ DOCKERIZED_BINARIES = {
     "webhook": {
         "target": "//cmd/webhook:webhook",
     },
+    "approver": {
+        "target": "//cmd/approver:approver",
+    },
 }
 
 # When pushing to quay.io, we want to use an arch, since the archless name is now used for a

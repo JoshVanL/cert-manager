@@ -18,22 +18,20 @@ package approver
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cmclient "github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
-	cmlisters "github.com/jetstack/cert-manager/pkg/client/listers/certmanager/v1"
-	controllerpkg "github.com/jetstack/cert-manager/pkg/controller"
-	logf "github.com/jetstack/cert-manager/pkg/logs"
+	apiutil "github.com/jetstack/cert-manager/pkg/api/util"
+	cmapi "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 )
 
 const (
-	ControllerName = "certificaterequests-approver"
+	ApprovedMessage = "Certificate request has been approved by cert-manager.io"
 )
 
 // Controller is a CertificateRequest controller which manages the "Approved"
@@ -42,65 +40,64 @@ const (
 // signing controllers should wait until the "Approved" condition is set to
 // True before processing.
 type Controller struct {
-	// logger to be used by this controller
-	log logr.Logger
-
-	certificateRequestLister cmlisters.CertificateRequestLister
-	cmClient                 cmclient.Interface
-
+	client.Client
+	log      logr.Logger
 	recorder record.EventRecorder
-
-	queue workqueue.RateLimitingInterface
 }
 
-func init() {
-	// create certificate request approver controller
-	controllerpkg.Register(ControllerName, func(ctx *controllerpkg.Context) (controllerpkg.Interface, error) {
-		return controllerpkg.NewBuilder(ctx, ControllerName).
-			For(new(Controller)).Complete()
-	})
+func New(log logr.Logger, recorder record.EventRecorder, client client.Client) *Controller {
+	return &Controller{
+		Client:   client,
+		log:      log,
+		recorder: recorder,
+	}
 }
 
-// Register registers and constructs the controller using the provided context.
-// It returns the workqueue to be used to enqueue items, a list of
-// InformerSynced functions that must be synced, or an error.
-func (c *Controller) Register(ctx *controllerpkg.Context) (workqueue.RateLimitingInterface, []cache.InformerSynced, error) {
-	c.log = logf.FromContext(ctx.RootContext, ControllerName)
-	c.queue = workqueue.NewNamedRateLimitingQueue(controllerpkg.DefaultItemBasedRateLimiter(), ControllerName)
+// Reconcile will set the "Approved" condition to True on synced
+// CertificateRequests. If the "Denied", "Approved" or "Ready" condition
+// already exists, exit early.
+func (c *Controller) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	log := c.log.WithValues("certificaterequest", req.NamespacedName)
 
-	certificateRequestInformer := ctx.SharedInformerFactory.Certmanager().V1().CertificateRequests()
-	mustSync := append([]cache.InformerSynced{certificateRequestInformer.Informer().HasSynced})
-	certificateRequestInformer.Informer().AddEventHandler(&controllerpkg.QueuingEventHandler{Queue: c.queue})
-
-	c.certificateRequestLister = certificateRequestInformer.Lister()
-	c.cmClient = ctx.CMClient
-	c.recorder = ctx.Recorder
-
-	c.log.V(logf.DebugLevel).Info("certificate request approver controller registered")
-
-	return c.queue, mustSync, nil
-}
-
-func (c *Controller) ProcessItem(ctx context.Context, key string) error {
-	log := logf.FromContext(ctx)
-	dbg := log.V(logf.DebugLevel)
-
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		log.Error(err, "invalid resource key")
-		return nil
+	// Fetch the CertificateRequest resource being reconciled
+	cr := new(cmapi.CertificateRequest)
+	if err := c.Client.Get(ctx, req.NamespacedName, cr); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	cr, err := c.certificateRequestLister.CertificateRequests(namespace).Get(name)
-	if apierrors.IsNotFound(err) {
-		dbg.Info(fmt.Sprintf("certificate request in work queue no longer exists: %s", err))
-		return nil
+	switch {
+	case
+		// If the CertificateRequest has already been approved, exit early.
+		apiutil.CertificateRequestIsApproved(cr),
+
+		// If the CertificateRequest has already been denied, exit early.
+		apiutil.CertificateRequestIsDenied(cr),
+
+		// If the CertificateRequest is "Issued" or "Failed", exit early.
+		apiutil.CertificateRequestReadyReason(cr) == cmapi.CertificateRequestReasonFailed,
+		apiutil.CertificateRequestReadyReason(cr) == cmapi.CertificateRequestReasonIssued:
+
+		return ctrl.Result{}, nil
 	}
 
-	if err != nil {
-		return err
+	// Update the CertificateRequest approved condition to true.
+	apiutil.SetCertificateRequestCondition(cr,
+		cmapi.CertificateRequestConditionApproved,
+		cmmeta.ConditionTrue,
+		"cert-manager.io",
+		ApprovedMessage,
+	)
+
+	// Always retry on Update errors, even if forbidden due to missing RBAC. We
+	// may have our RBAC updated before the next sync.
+	if err := c.Status().Update(ctx, cr); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	ctx = logf.NewContext(ctx, logf.WithResource(log, cr))
-	return c.Sync(ctx, cr)
+	c.recorder.Event(cr, corev1.EventTypeNormal, "cert-manager.io", ApprovedMessage)
+
+	log.Info("approved certificate request")
+
+	return ctrl.Result{}, nil
 }

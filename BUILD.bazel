@@ -29,6 +29,7 @@ container_bundle(
         "{STABLE_DOCKER_REGISTRY}/cert-manager-acmesolver:{STABLE_DOCKER_TAG}": "//build:acmesolver.image",
         "{STABLE_DOCKER_REGISTRY}/cert-manager-webhook:{STABLE_DOCKER_TAG}": "//build:webhook.image",
         "{STABLE_DOCKER_REGISTRY}/cert-manager-cainjector:{STABLE_DOCKER_TAG}": "//build:cainjector.image",
+        "{STABLE_DOCKER_REGISTRY}/cert-manager-approver:{STABLE_DOCKER_TAG}": "//build:approver.image",
     },
     tags = ["manual"],
 )
@@ -57,6 +58,7 @@ filegroup(
         ":package-srcs",
         "//build:all-srcs",
         "//cmd/acmesolver:all-srcs",
+        "//cmd/approver:all-srcs",
         "//cmd/cainjector:all-srcs",
         "//cmd/controller:all-srcs",
         "//cmd/ctl:all-srcs",

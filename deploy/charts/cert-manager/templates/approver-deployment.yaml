@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "approver.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: {{ template "approver.name" . }}
+    app.kubernetes.io/name: {{ template "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ template "approver.chart" . }}
+  {{- if .Values.approver.deploymentAnnotations }}
+  annotations:
+{{ toYaml .Values.approver.deploymentAnnotations | indent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.approver.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "approver.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: "approver"
+  {{- with .Values.approver.strategy }}
+  strategy:
+    {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "approver.name" . }}
+        app.kubernetes.io/name: {{ template "approver.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: "approver"
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        helm.sh/chart: {{ template "approver.chart" . }}
+{{- if .Values.approver.podLabels }}
+{{ toYaml .Values.approver.podLabels | indent 8 }}
+{{- end }}
+      {{- if .Values.approver.podAnnotations }}
+      annotations:
+{{ toYaml .Values.approver.podAnnotations | indent 8 }}
+      {{- end }}
+      {{- if and .Values.prometheus.enabled (not .Values.prometheus.servicemonitor.enabled) }}
+      {{- if not .Values.podAnnotations }}
+      annotations:
+      {{- end }}
+        prometheus.io/path: "/metrics"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9402'
+      {{- end }}
+    spec:
+      serviceAccountName: {{ template "approver.serviceAccountName" . }}
+      {{- if .Values.global.priorityClassName }}
+      priorityClassName: {{ .Values.global.priorityClassName | quote }}
+      {{- end }}
+      {{- $enabledDefined := gt (len (keys (pick .Values.approver.securityContext "enabled"))) 0 }}
+      {{- $legacyEnabledExplicitlyOff := and $enabledDefined (not .Values.approver.securityContext.enabled) }}
+      {{- if and .Values.approver.securityContext (not $legacyEnabledExplicitlyOff) }}
+      securityContext:
+        {{- if .Values.approver.securityContext.enabled -}}
+        {{/* support legacy securityContext.enabled and its two parameters */}}
+        fsGroup: {{ default 1001 .Values.approver.securityContext.fsGroup }}
+        runAsUser: {{ default 1001 .Values.approver.securityContext.runAsUser }}
+        {{- else -}}
+        {{/* this is the way forward: support an arbitrary yaml block */}}
+{{ toYaml .Values.approver.securityContext | indent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.approver.volumes }}
+      volumes:
+{{ toYaml .Values.approver.volumes | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.approver.image }}
+          image: "{{- if .registry -}}{{ .registry }}/{{- end -}}{{ .repository }}{{- if (.digest) -}} @{{.digest}}{{- else -}}:{{ default $.Chart.AppVersion .tag }} {{- end -}}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.approver.image.pullPolicy }}
+          args:
+        {{- if .Values.global.logLevel }}
+          - --v={{ .Values.global.logLevel }}
+        {{- end }}
+        {{- with .Values.global.leaderElection }}
+          - --leader-election-namespace={{ .namespace }}
+        {{- if .leaseDuration }}
+          - --leader-election-lease-duration={{ .leaseDuration }}
+        {{- end }}
+        {{- if .renewDeadline }}
+          - --leader-election-renew-deadline={{ .renewDeadline }}
+        {{- end }}
+        {{- if .retryPeriod }}
+          - --leader-election-retry-period={{ .retryPeriod }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.approver.extraArgs }}
+{{ toYaml .Values.approver.extraArgs | indent 10 }}
+        {{- end }}
+          ports:
+          - containerPort: 9402
+            protocol: TCP
+          {{- if .Values.approver.containerSecurityContext }}
+          securityContext:
+            {{- toYaml .Values.approver.containerSecurityContext | nindent 12 }}
+          {{- end }}
+          {{- if .Values.approver.volumeMounts }}
+          volumeMounts:
+{{ toYaml .Values.approver.volumeMounts | indent 12 }}
+          {{- end }}
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if .Values.approver.extraEnv }}
+{{ toYaml .Values.approver.extraEnv | indent 10 }}
+        {{- end }}
+          resources:
+{{ toYaml .Values.approver.resources | indent 12 }}
+    {{- with .Values.approver.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.approver.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.approver.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+{{- if .Values.podDnsPolicy }}
+      dnsPolicy: {{ .Values.podDnsPolicy }}
+{{- end }}
+{{- if .Values.podDnsConfig }}
+      dnsConfig:
+{{ toYaml .Values.podDnsConfig | indent 8 }}
+{{- end }}

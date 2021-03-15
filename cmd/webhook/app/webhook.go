@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/jetstack/cert-manager/cmd/webhook/app/options"
@@ -34,11 +35,20 @@ import (
 	"github.com/jetstack/cert-manager/pkg/webhook/server/tls"
 )
 
-var validationHook handlers.ValidatingAdmissionHook = handlers.NewRegistryBackedValidator(logf.Log, webhook.Scheme, webhook.ValidationRegistry)
 var mutationHook handlers.MutatingAdmissionHook = handlers.NewRegistryBackedMutator(logf.Log, webhook.Scheme, webhook.MutationRegistry)
 var conversionHook handlers.ConversionHook = handlers.NewSchemeBackedConverter(logf.Log, webhook.Scheme)
 
 func NewServerWithOptions(log logr.Logger, opts options.WebhookOptions) (*server.Server, error) {
+	restcfg, err := clientcmd.BuildConfigFromFlags("", opts.Kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	cl, err := kubernetes.NewForConfig(restcfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating kubernetes client: %s", err)
+	}
+
 	var source tls.CertificateSource
 	switch {
 	case options.FileTLSSourceEnabled(opts):
@@ -49,11 +59,6 @@ func NewServerWithOptions(log logr.Logger, opts options.WebhookOptions) (*server
 			Log:      log,
 		}
 	case options.DynamicTLSSourceEnabled(opts):
-		restcfg, err := clientcmd.BuildConfigFromFlags("", opts.Kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-
 		log.V(logf.InfoLevel).Info("using dynamic certificate generating using CA stored in Secret resource", "secret_namespace", opts.DynamicServingCASecretNamespace, "secret_name", opts.DynamicServingCASecretName)
 		source = &tls.DynamicSource{
 			DNSNames: opts.DynamicServingDNSNames,
@@ -67,6 +72,11 @@ func NewServerWithOptions(log logr.Logger, opts options.WebhookOptions) (*server
 		}
 	default:
 		log.V(logf.WarnLevel).Info("serving insecurely as tls certificate data not provided")
+	}
+
+	validationHook, err := handlers.NewRegistryBackedValidator(logf.Log, webhook.Scheme, webhook.ValidationRegistry, cl.AuthorizationV1().SubjectAccessReviews())
+	if err != nil {
+		return nil, err
 	}
 
 	return &server.Server{

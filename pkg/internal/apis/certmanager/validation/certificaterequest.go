@@ -31,6 +31,7 @@ import (
 	"github.com/jetstack/cert-manager/pkg/apis/acme"
 	"github.com/jetstack/cert-manager/pkg/apis/certmanager"
 	cmapi "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager"
+	internalutil "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/util"
 	cmmeta "github.com/jetstack/cert-manager/pkg/internal/apis/meta"
 	"github.com/jetstack/cert-manager/pkg/util"
 	"github.com/jetstack/cert-manager/pkg/util/pki"
@@ -166,20 +167,20 @@ func ValidateCertificateRequestApprovalCondition(crConds []cmapi.CertificateRequ
 func ValidateUpdateCertificateRequestApprovalCondition(oldCRConds, newCRConds []cmapi.CertificateRequestCondition, fldPath *field.Path) field.ErrorList {
 	var (
 		el            = field.ErrorList{}
-		oldCRDenied   = getCertificateRequestCondition(oldCRConds, cmapi.CertificateRequestConditionDenied)
-		oldCRApproved = getCertificateRequestCondition(oldCRConds, cmapi.CertificateRequestConditionApproved)
+		oldCRDenied   = internalutil.GetCertificateRequestCondition(oldCRConds, cmapi.CertificateRequestConditionDenied)
+		oldCRApproved = internalutil.GetCertificateRequestCondition(oldCRConds, cmapi.CertificateRequestConditionApproved)
 	)
 
 	// If the approval condition has been set, ensure it hasn't been modified.
 	if oldCRApproved != nil && !reflect.DeepEqual(oldCRApproved,
-		getCertificateRequestCondition(newCRConds, cmapi.CertificateRequestConditionApproved),
+		internalutil.GetCertificateRequestCondition(newCRConds, cmapi.CertificateRequestConditionApproved),
 	) {
 		el = append(el, field.Forbidden(fldPath, "'Approved' condition may not be modified once set"))
 	}
 
 	// If the denied condition has been set, ensure it hasn't been modified.
 	if oldCRDenied != nil && !reflect.DeepEqual(oldCRDenied,
-		getCertificateRequestCondition(newCRConds, cmapi.CertificateRequestConditionDenied),
+		internalutil.GetCertificateRequestCondition(newCRConds, cmapi.CertificateRequestConditionDenied),
 	) {
 		el = append(el, field.Forbidden(fldPath, "'Denied' condition may not be modified once set"))
 	}
@@ -279,13 +280,4 @@ func ensureCertSignIsSet(list []cmapi.KeyUsage) []cmapi.KeyUsage {
 	}
 
 	return append(list, cmapi.UsageCertSign)
-}
-
-func getCertificateRequestCondition(conds []cmapi.CertificateRequestCondition, conditionType cmapi.CertificateRequestConditionType) *cmapi.CertificateRequestCondition {
-	for _, cond := range conds {
-		if cond.Type == conditionType {
-			return &cond
-		}
-	}
-	return nil
 }

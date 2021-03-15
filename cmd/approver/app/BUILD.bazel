@@ -1,0 +1,43 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["approver.go"],
+    importpath = "github.com/jetstack/cert-manager/cmd/approver/app",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cmd/approver/app/options:go_default_library",
+        "//pkg/apis/certmanager/v1:go_default_library",
+        "//pkg/controller/certificaterequests/approver:go_default_library",
+        "//pkg/logs:go_default_library",
+        "//pkg/util:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+        "@io_k8s_api//core/v1:go_default_library",
+        "@io_k8s_apimachinery//pkg/runtime:go_default_library",
+        "@io_k8s_apimachinery//pkg/util/errors:go_default_library",
+        "@io_k8s_client_go//kubernetes:go_default_library",
+        "@io_k8s_client_go//kubernetes/scheme:go_default_library",
+        "@io_k8s_client_go//kubernetes/typed/core/v1:go_default_library",
+        "@io_k8s_client_go//rest:go_default_library",
+        "@io_k8s_client_go//tools/clientcmd:go_default_library",
+        "@io_k8s_client_go//tools/record:go_default_library",
+        "@io_k8s_sigs_controller_runtime//:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/approver/app/options:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

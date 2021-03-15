@@ -1,0 +1,141 @@
+{{- if .Values.global.rbac.create -}}
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "approver.fullname" . }}:leaderelection
+  namespace: {{ .Values.global.leaderElection.namespace }}
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+rules:
+  # Used for leader election by the controller
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["cert-manager-approver"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+
+---
+
+# grant cert-manage-approver permission to manage the leaderelection configmap
+# in the leader election namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "approver.fullname" . }}:leaderelection
+  namespace: {{ .Values.global.leaderElection.namespace }}
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "approver.fullname" . }}:leaderelection
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ template "approver.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+
+---
+
+# CertificateRequests controller role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "approver.fullname" . }}
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests/status"]
+    verbs: ["update"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "approver.fullname" . }}
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "approver.fullname" . }}
+subjects:
+  - name: {{ template "approver.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace | quote }}
+    kind: ServiceAccount
+
+---
+
+# Permission to approve CertificateRequests referencing cert-manager.io Issuers and ClusterIssuers
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "approver.fullname" . }}:cert-manager
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["signers"]
+    verbs: ["approve"]
+    resourceNames: ["cert-manager.io/Issuer", "cert-manager.io/ClusterIssuer"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "approver.fullname" . }}:cert-manager
+  labels:
+    app: {{ include "approver.name" . }}
+    app.kubernetes.io/name: {{ include "approver.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: "approver"
+    helm.sh/chart: {{ include "approver.chart" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "approver.fullname" . }}:cert-manager
+subjects:
+  - name: {{ template "approver.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace | quote }}
+    kind: ServiceAccount
+
+
+{{- end -}}
